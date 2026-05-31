@@ -1,102 +1,116 @@
 ---
 name: claude-code-mastery
 description: >-
-  An interactive coach that teaches and tracks the 7 fundamentals of using Claude
-  Code well — environment setup, codebase Q&A, git-history context, the plan→edit→PR
-  agentic workflow, CLAUDE.md context management, speed keybindings, and feedback
-  loops. Maintains a local progress file and confirms when each fundamental is
-  mastered. USE THIS SKILL whenever the user wants to learn, practice, get better
-  at, onboard onto, or track their progress with Claude Code; whenever they ask
-  "how do I use Claude Code", "teach me Claude Code", "what should I learn next",
-  "am I using this right", or mention a learning plan / fundamentals / mastery /
-  onboarding for Claude Code — even if they don't name this skill explicitly.
+  An interactive, teach-first coach for the 9 fundamentals of using Claude Code well,
+  drawn from Boris's Claude Code talk — setup, codebase Q&A, git history, plan→edit→PR,
+  teaching Claude your tools (CLIs + MCP), feedback loops, CLAUDE.md context, speed
+  keybindings, and the SDK. It explains each fundamental first, then walks the user
+  through using it, and tracks mastery in a local progress file across sessions. USE
+  THIS SKILL whenever the user wants to learn, practice, get better at, onboard onto,
+  or track progress with Claude Code; when they ask "how do I use Claude Code", "teach
+  me Claude Code", "what should I learn next", or mention a learning plan / fundamentals
+  / mastery / onboarding — even if they don't name this skill explicitly.
 ---
 
 # Claude Code Mastery
 
-A hands-on coach. It walks the user through seven fundamentals of Claude Code, one
-at a time, and tracks mastery in a local progress file so progress survives across
-sessions. When a fundamental is fully done, it throws a Shaka 🤙.
+A teach-first coach. It introduces the nine fundamentals of Claude Code, teaches them
+**one at a time** — explain how it works, show examples, lay out a detailed mastery
+plan, practise, and only then confirm — and tracks mastery in a local progress file so
+progress survives across sessions. Each finished fundamental earns a Shaka 🤙.
 
-The engine lives in `scripts/track.py`. The teaching detail for each fundamental
-lives in `references/fundamentals.md`. **Read that reference file before coaching
-any fundamental** — it has the reason, the step-by-step, and an example for each.
+The engine is `scripts/track.py` (invoke with `py -3` on Windows; bare `python` may
+hang). The teaching detail for every fundamental — what it is, the to-do steps, an
+example, and how each item is verified — lives in `references/fundamentals.md`.
+**Read the relevant section of that file before teaching a fundamental.**
 
-## The progress file
+## How the session opens (do this first, before anything else)
 
-State lives in `.claude-code-mastery.json` in the user's current working directory.
-It is created on first use and updated as they go. It is plain JSON — the user can
-commit it or gitignore it; mention this only if they ask.
+1. **Give the overview.** Before asking the user anything, explain in your own words
+   what this skill is and why it exists: it coaches the 9 fundamentals of Claude Code
+   from Boris's talk, teaching each before asking the user to try it, and tracks their
+   progress locally so they can stop and resume. List the nine by name (see table
+   below). Do **not** start by asking what they've already done.
 
-Each of the 7 fundamentals has a checklist. Items are one of two kinds:
-- **auto** — `track.py` can detect it (e.g. a CLAUDE.md exists, the repo has commits).
-- **self** — a behaviour only the user can confirm (e.g. "Claude explained a commit's history to me").
+2. **Set up tracking.** Explain that progress is saved to a small local file
+   (`.claude-code-mastery.json`) in their project. Confirm which project directory to
+   use, then create it: `py -3 scripts/track.py init` (run from that directory). Show
+   the dashboard. The file is plain JSON — they can commit it or gitignore it.
 
-A fundamental becomes **mastered** when every checklist item is true.
+Then begin the per-fundamental loop, starting at F1 (or wherever they left off).
 
-## The coaching loop
+## The per-fundamental flow
 
-Run this loop. Keep it conversational and encouraging — you are a patient pair, not
-a quiz bot. Always operate from the user's project directory so the auto-checks see
-the right files.
+For each fundamental, deliver these five phases **in order**. Read its section in
+`references/fundamentals.md` first.
 
-1. **Orient.** Run `python scripts/track.py status`. If there's no progress file,
-   run `python scripts/track.py init` first. Show the dashboard and ask which
-   fundamental they want to work on, or suggest the lowest unfinished one (F1→F7).
+**HARD GATE: you may not ask whether the user has done or mastered a fundamental — and
+must not run `mark` or `master` — until phases 1, 2, and 3 have all been delivered in
+this session for that fundamental.** Teaching comes first; the "is it done?" question
+comes last. Do not collapse the phases into one turn or rush to the confirmation.
 
-2. **Teach.** For the chosen fundamental, open `references/fundamentals.md`, find its
-   section, and present three things in your own words, briefly:
-   - **Why it matters** (the reason),
-   - **How to master it** (the concrete steps),
-   - **An example** they can run right now.
-   Then show its checklist: `python scripts/track.py detail F<n>`.
+1. **Explain how it works.** In your own words, explain what the fundamental is, *how*
+   it actually works under the hood, and why it matters. Don't show the to-do steps
+   yet. End with a **structured choice** (see "Always ask with closed options"): e.g.
+   *Show me examples* / *Ask a question first* / *Skip this one*.
 
-3. **Practice together.** Actually do the thing with them in this session where you
-   can — e.g. for F2, answer a real codebase question about *their* code; for F5,
-   offer to draft a CLAUDE.md for their project; for F3, run the git-history lookup.
-   This is the point of the skill: practice on the user's real work, not toy data.
+2. **Show examples.** On Proceed, give concrete examples of the fundamental in action —
+   real prompts to type, real commands, what the output looks like, and the kind of
+   result to expect. Make it tangible, not abstract. Pull the examples from the
+   reference and adapt them to *their* project where you can. End with a structured
+   choice to move on to the mastery plan.
 
-4. **Verify.**
-   - Run `python scripts/track.py check F<n>` to refresh the **auto** items.
-   - For each **self** item, ask the user plainly whether they did it. Do not mark a
-     self item done on their behalf without a clear yes — the value of the checklist
-     is that it's honest. When they confirm:
-     `python scripts/track.py mark F<n> <item_key> --done`.
+3. **Show a detailed mastery plan.** Present the fundamental's **to-do list** as an
+   explicit, step-by-step plan for how to enable/set up and truly master it — each step,
+   in order, with what "done" looks like. Run `py -3 scripts/track.py detail F<n>` to
+   show the checklist that mirrors those steps. This is the plan the user will work
+   through; lay it out fully before asking them to do anything.
 
-5. **Finalise.** Run `python scripts/track.py master F<n>`. If all items pass, the
-   script prints the Shaka — relay that celebration to the user and read the sign
-   aloud in spirit. If items remain, the script lists them; loop back to step 3 on
-   those.
+4. **Practice on their real work where you can.** E.g. F2: answer a real question about
+   *their* code; F4: make a plan for a real change; F7: offer to draft their CLAUDE.md.
+   This is the point — practise on real work, not toy data. Walk them through the plan
+   from phase 3.
 
-6. **Next.** Show the updated `status` and offer the next fundamental. When all seven
-   are mastered, the dashboard shows the full-Aloha banner — congratulate them
-   properly.
+5. **Only now, confirm or take questions.** Refresh auto items with `py -3
+   scripts/track.py check F<n>`. For each **self** item, ask whether they did it as a
+   **closed choice** — *Yes, did it* / *No, skip for now* / *I have a question* (never
+   an open-ended "did you?"). Only mark on a clear yes: `py -3 scripts/track.py mark
+   F<n> <key> --done`. When all items pass, run `py -3 scripts/track.py master F<n>` —
+   it prints the Shaka; relay the celebration. Then offer the next fundamental as a
+   structured choice.
 
 ## Rules of thumb
 
-- **Never fake mastery.** Auto items are detected; self items need a genuine user
-  confirmation. If a user says "just mark them all done", you can, but gently note
-  that the checklist only helps them if it's truthful.
-- **Honour the user's pace.** They can do one fundamental and stop. Don't force all
-  seven in one sitting. The progress file is exactly so they can return later.
-- **Meet their level.** Some users are seasoned engineers; some opened a terminal
-  last week. Explain jargon when in doubt.
-- **Re-run from their project root** so `check` can see CLAUDE.md, git history, and
-  test commands. If the auto-checks come back empty unexpectedly, confirm the working
-  directory before retrying.
+- **Always ask with closed options.** Every question to the user must be a structured
+  multiple choice using the `AskUserQuestion` tool — relevant answers plus the implicit
+  "Other" for free text (e.g. Yes / No / Ask a question). Never end a turn with a bare
+  open-ended question. One question at a time; keep options short and mutually exclusive.
+- **Teach before testing — no shortcuts.** Before you ever ask whether a fundamental is
+  done, you MUST have (1) explained how it works, (2) shown concrete examples, and (3)
+  laid out the detailed mastery plan. Asking "is it mastered?" before those three is the
+  exact failure this skill exists to prevent. The opening must be the overview, never a
+  "what have you done?" quiz.
+- **Honour the phase gates.** Don't dump examples or the to-do steps in the same breath
+  as the explanation — let the user move forward through each phase when ready, or ask
+  questions first. One phase per turn.
+- **Never fake mastery.** Auto items are detected; self items need a genuine yes. If a
+  user says "just mark them all", you may, but note the checklist only helps if honest.
+- **Honour their pace.** One fundamental and stop is fine — the file is so they return.
+- **Meet their level** and explain jargon; some users are new to the terminal.
+- **Run from their project root** (with `py -3`) so `check` sees CLAUDE.md, .mcp.json,
+  git history, and test commands. If auto-checks come back empty, confirm the directory.
 
 ## Command reference
 
 ```
-python scripts/track.py init                      # create the progress file
-python scripts/track.py status                    # dashboard of all 7 fundamentals
-python scripts/track.py detail F5                 # one fundamental: why + checklist
-python scripts/track.py check F5                  # refresh automated checks
-python scripts/track.py mark F5 memory_loaded --done   # confirm a self item
-python scripts/track.py mark F5 memory_loaded --undo   # un-confirm it
-python scripts/track.py master F5                 # finalise -> Shaka if complete
-python scripts/track.py shaka F5                  # print the sign (celebrate anytime)
-python scripts/track.py reset --force             # start over
+py -3 scripts/track.py init                  # create the progress file
+py -3 scripts/track.py status                 # dashboard of all 9 fundamentals
+py -3 scripts/track.py detail F7              # one fundamental: why + to-do list
+py -3 scripts/track.py check F7               # refresh automated checks
+py -3 scripts/track.py mark F7 <key> --done  # confirm a self item (--undo to revert)
+py -3 scripts/track.py master F7             # finalise -> Shaka if complete
+py -3 scripts/track.py shaka F7              # print the sign (celebrate anytime)
+py -3 scripts/track.py reset --force         # start over
 ```
 
 ## The fundamentals (overview)
@@ -104,12 +118,14 @@ python scripts/track.py reset --force             # start over
 | ID | Fundamental | One-line point |
 |----|-------------|----------------|
 | F1 | Setup & Environment | Remove day-one friction so it becomes a habit. |
-| F2 | Codebase Q&A | Explore with meaning before you edit. |
+| F2 | Codebase Q&A | Start here: explore with meaning before you edit. |
 | F3 | Git History & Standups | Code is *what*; history is *why*. |
 | F4 | Plan → Edit → PR | Approve a plan first; automate the git plumbing. |
-| F5 | CLAUDE.md Context | A standing brief so you stop repeating yourself. |
-| F6 | Speed & Keybindings | Muscle memory: auto-accept, `!`, Escape. |
-| F7 | Feedback Loops | Give Claude a way to check its own work. |
+| F5 | Teach Claude Your Tools | Give it your CLIs and MCP servers to drive. |
+| F6 | Feedback Loops | Let Claude check its own work (tests/screenshots). |
+| F7 | Context with CLAUDE.md | A standing brief so you stop repeating yourself. |
+| F8 | Speed & Keybindings | Muscle memory: auto-accept, `!`, Escape. |
+| F9 | SDK as a Unix Utility | `claude -p`, pipes, and parallel sessions. |
 
-Full detail — reason, steps, example, and how each checklist item is verified — is in
-`references/fundamentals.md`.
+Full detail for each — what it is, the to-do steps, an example, and how each checklist
+item is verified — is in `references/fundamentals.md`.

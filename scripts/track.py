@@ -3,17 +3,17 @@
 Claude Code Mastery — progress tracker.
 
 Creates and maintains a local progress file (.claude-code-mastery.json) in the
-current directory, walks a learner through 7 fundamentals, runs best-effort
-automated checks, lets them confirm the behavioural items, and throws a Shaka
-when a fundamental is fully mastered.
+current directory, walks a learner through the 9 fundamentals from Boris's Claude
+Code talk, runs best-effort automated checks, lets them confirm the behavioural
+items, and throws a Shaka when a fundamental is fully mastered.
 
 Usage:
     python track.py init                 # create the progress file (idempotent)
     python track.py status               # dashboard of all fundamentals
     python track.py detail F5            # show one fundamental + its checklist
     python track.py check F5             # run automated checks, update those items
-    python track.py mark F5 claude_md_exists --done   # toggle a self-attested item
-    python track.py mark F5 claude_md_exists --undo
+    python track.py mark F5 memory_loaded --done   # toggle a self-attested item
+    python track.py mark F5 memory_loaded --undo
     python track.py master F5            # mark mastered IF all items pass -> Shaka
     python track.py shaka                # print the Shaka sign
     python track.py reset --force        # wipe progress and start over
@@ -24,14 +24,20 @@ The progress file is plain JSON and safe to commit or .gitignore — your call.
 import argparse
 import datetime as _dt
 import json
-import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+# Windows consoles default to cp1252, which can't encode the em-dashes, box
+# characters, and emoji this script prints — force UTF-8 so output never breaks.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 PROGRESS_FILENAME = ".claude-code-mastery.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 # --------------------------------------------------------------------------- #
@@ -39,83 +45,111 @@ SCHEMA_VERSION = 1
 # Each checklist item: key -> {label, kind}
 #   kind "auto"  : track.py can detect it (still overridable by hand)
 #   kind "self"  : a behaviour the learner confirms ("I did this with Claude")
+# The checklist doubles as the fundamental's "to-do list" in the teaching flow.
 # --------------------------------------------------------------------------- #
 FUNDAMENTALS = {
     "F1": {
         "title": "Setup & Environment Optimization",
-        "why": "If the tool fights you on day one, you won't reach for it. A few "
-               "minutes of setup (newlines, theme, GitHub app) removes friction so "
-               "Claude Code becomes a daily habit instead of a novelty.",
+        "why": "A tool you fight on day one is a tool you abandon by day three. A few "
+               "minutes removing input friction and connecting your repo turns Claude "
+               "Code from a novelty into something you reach for without thinking.",
         "checklist": {
-            "config_present": {"label": "Claude Code config detected on this machine", "kind": "auto"},
-            "newline_without_submit": {"label": "Can add a newline without submitting (terminal-setup / Shift+Enter)", "kind": "self"},
-            "theme_set": {"label": "Picked a comfortable theme (light / dark / daltonize)", "kind": "self"},
-            "github_app": {"label": "GitHub app connected so @mentions work on issues/PRs", "kind": "self"},
+            "config_present": {"label": "Claude Code installed & config detected on this machine", "kind": "auto"},
+            "terminal_setup": {"label": "Ran /terminal-setup so Shift+Enter inserts a newline", "kind": "self"},
+            "theme_set": {"label": "Picked a comfortable theme via /theme (light / dark / daltonize)", "kind": "self"},
+            "github_app": {"label": "Ran /install-github-app so @mentions work on issues/PRs", "kind": "self"},
+            "allowed_tools": {"label": "Customized allowed tools so routine commands aren't re-prompted", "kind": "self"},
         },
     },
     "F2": {
-        "title": "Codebase Q&A (explore before you edit)",
-        "why": "Before letting Claude change code, use it as a search engine that "
-               "understands meaning, not just text. Asking how a thing is used gives "
-               "you a wiki-style explanation that a Cmd+F never could.",
+        "title": "Codebase Q&A (start here)",
+        "why": "The first move isn't editing — it's using Claude as a search engine that "
+               "understands meaning. Asking how a thing is used gives a wiki-style tour a "
+               "Cmd+F never could. No indexing, code stays local, zero setup.",
         "checklist": {
-            "deeper_than_search": {"label": "Got a deeper answer than a plain text search would give", "kind": "self"},
-            "usage_followup": {"label": "Asked a follow-up like 'how is this used?' and got the logic explained", "kind": "self"},
+            "asked_question": {"label": "Asked Claude a real question about your codebase", "kind": "self"},
+            "deeper_than_search": {"label": "Got an answer deeper than a text search (how something is built/used)", "kind": "self"},
+            "usage_followup": {"label": "Asked a 'how is this used across the project?' follow-up", "kind": "self"},
         },
     },
     "F3": {
         "title": "Git History & Standup Reports",
-        "why": "Code tells you what; git history tells you why. Claude can read your "
-               "local log and linked issues to explain decisions — and summarise what "
-               "you personally shipped for your standup.",
+        "why": "Code tells you what; git history tells you why. Claude reads your local "
+               "log and linked issues to reconstruct decisions — and summarises what you "
+               "personally shipped, the standup nobody enjoys writing.",
         "checklist": {
             "in_git_repo": {"label": "Working inside a git repository", "kind": "auto"},
-            "history_explained": {"label": "Claude explained the historical 'why' of a function or commit", "kind": "self"},
+            "history_explained": {"label": "Claude explained the historical 'why' of a confusing function", "kind": "self"},
             "shipped_summary": {"label": "Got a 'what did I ship this week?' summary of your commits", "kind": "self"},
         },
     },
     "F4": {
         "title": "Agentic Workflow: Plan -> Edit -> PR",
-        "why": "Letting Claude run ahead unsupervised is how you get surprises. Asking "
-               "for a plan first keeps you in control; the 'commit push PR' incantation "
-               "then automates the tedious git/PR plumbing once you approve.",
+        "why": "Turning the agent loose unsupervised gives sprawling surprise diffs. "
+               "Asking for a plan first keeps you in control; once you approve, the "
+               "'commit push PR' incantation automates the tedious git/PR plumbing.",
         "checklist": {
             "recent_commits": {"label": "Repository has recent commit activity", "kind": "auto"},
-            "plan_approved": {"label": "Approved a plan BEFORE Claude touched a file", "kind": "self"},
-            "pr_created": {"label": "Claude created a branch + commit + PR via 'commit push PR'", "kind": "self"},
+            "plan_approved": {"label": "Asked for a plan and approved it BEFORE any file changed", "kind": "self"},
+            "edit_made": {"label": "Let Claude implement the approved change", "kind": "self"},
+            "pr_created": {"label": "Used 'commit push PR' to branch, commit, push & open a PR", "kind": "self"},
         },
     },
     "F5": {
-        "title": "Context Management with CLAUDE.md",
-        "why": "Claude starts each session with no memory of your project. A CLAUDE.md "
-               "file is the standing brief it reads every time — your commands, style "
-               "rules, and gotchas — so you stop repeating yourself.",
+        "title": "Teach Claude Your Tools (CLIs + MCP)",
+        "why": "Claude shines when it can drive your team's tools. Tell it about a CLI "
+               "(point it at --help), or add an MCP server, and it uses them on your "
+               "behalf. Check an .mcp.json into the repo so the whole team gets them.",
         "checklist": {
-            "claude_md_exists": {"label": "A CLAUDE.md exists in the project", "kind": "auto"},
-            "memory_loaded": {"label": "/memory confirms your project rules are loaded", "kind": "self"},
-            "memory_shortcut": {"label": "Added a note mid-session with the '#' shortcut", "kind": "self"},
+            "mcp_config": {"label": "An .mcp.json exists in the project (shared MCP servers)", "kind": "auto"},
+            "cli_taught": {"label": "Told Claude about a CLI and had it learn via --help / run it", "kind": "self"},
+            "mcp_used": {"label": "Added or used an MCP server's tools in a session", "kind": "self"},
         },
     },
     "F6": {
-        "title": "Speed & Keybindings",
-        "why": "The difference between 'neat' and 'fast' is muscle memory. Auto-accept "
-               "for work you trust, '!' to feed command output back in, and Escape to "
-               "stop a wayward edit are the three that compound the most.",
+        "title": "Feedback Loops (let Claude check its work)",
+        "why": "The single biggest quality lever. Give Claude a test command or a way to "
+               "screenshot, and it iterates to a working result instead of handing you "
+               "untested code. Drop in a UI mock and let it iterate to match.",
         "checklist": {
-            "bash_mode": {"label": "Used '!' to pipe a command's output into Claude's context", "kind": "self"},
-            "escape_undo": {"label": "Stopped an edit with Escape, then redirected it", "kind": "self"},
-            "auto_accept": {"label": "Entered auto-accept mode (Shift+Tab) for trusted work", "kind": "self"},
+            "test_cmd_present": {"label": "Project exposes a test/build command Claude can run", "kind": "auto"},
+            "iterated_on_feedback": {"label": "Claude iterated on a change using a test or screenshot it ran itself", "kind": "self"},
+            "visual_coding": {"label": "Tried visual coding (dropped a mock image) OR wired up a checker tool", "kind": "self"},
         },
     },
     "F7": {
-        "title": "Feedback Loops & Advanced Tools",
-        "why": "Claude is dramatically better when it can check its own work. Give it a "
-               "test command or a way to take screenshots and it iterates to a working "
-               "result instead of handing you untested code.",
+        "title": "Context Management (CLAUDE.md & friends)",
+        "why": "Claude starts each session with no memory of your project. CLAUDE.md is "
+               "the standing brief it auto-reads every time — commands, style, gotchas. "
+               "Slash commands, /memory and the '#' shortcut extend it. Keep it short.",
         "checklist": {
-            "test_cmd_present": {"label": "Project exposes a test/build command Claude can run", "kind": "auto"},
-            "iterated_on_feedback": {"label": "Claude iterated on a feature using a test or screenshot it ran itself", "kind": "self"},
-            "sdk_pipe": {"label": "Used a '-p' pipe, e.g. `git status | claude -p \"summarise\"`", "kind": "self"},
+            "claude_md_exists": {"label": "A CLAUDE.md exists in the project", "kind": "auto"},
+            "memory_loaded": {"label": "Ran /memory to see which context files are loaded", "kind": "self"},
+            "memory_shortcut": {"label": "Used the '#' shortcut to remember something mid-session", "kind": "self"},
+            "slash_command": {"label": "Created or used a custom slash command (.claude/commands)", "kind": "self"},
+        },
+    },
+    "F8": {
+        "title": "Speed & Keybindings",
+        "why": "The gap between 'neat' and 'fast' is muscle memory. Auto-accept for work "
+               "you trust, '!' to feed command output back in, and Escape to stop a "
+               "wayward edit are the bindings that compound the most.",
+        "checklist": {
+            "bash_mode": {"label": "Used '!' to run a command and pipe its output into context", "kind": "self"},
+            "escape_interrupt": {"label": "Hit Escape to stop an edit, then redirected it", "kind": "self"},
+            "auto_accept": {"label": "Entered auto-accept mode (Shift+Tab) for trusted work", "kind": "self"},
+            "resume_session": {"label": "Resumed a session (--resume / --continue) or viewed full output (Ctrl+R)", "kind": "self"},
+        },
+    },
+    "F9": {
+        "title": "SDK as a Unix Utility (+ parallel)",
+        "why": "`claude -p` is a scriptable, super-intelligent Unix utility: pipe in, pipe "
+               "out, choose JSON or streaming. Power users run many sessions at once via "
+               "tmux/SSH, extra checkouts, or git worktrees.",
+        "checklist": {
+            "sdk_pipe": {"label": "Used `claude -p`, e.g. `git status | claude -p \"summarise\"`", "kind": "self"},
+            "sdk_flags": {"label": "Tried --output-format / --allowed-tools, or used it in a script/CI", "kind": "self"},
+            "parallel_sessions": {"label": "Ran parallel sessions (tmux / extra checkouts / git worktrees)", "kind": "self"},
         },
     },
 }
@@ -152,21 +186,70 @@ def fresh_state() -> dict:
     }
 
 
+def _migrate(state: dict) -> bool:
+    """Bring an older progress file up to the current fundamentals schema.
+
+    Preserves every checklist value the user already earned (matched by key),
+    adds any new fundamentals/items as False, drops obsolete ones, and refreshes
+    titles. Returns True if anything changed.
+    """
+    changed = False
+    state.setdefault("fundamentals", {})
+    fts = state["fundamentals"]
+
+    # Drop fundamentals that no longer exist.
+    for fid in list(fts.keys()):
+        if fid not in FUNDAMENTALS:
+            del fts[fid]
+            changed = True
+
+    for fid in ORDER:
+        spec = FUNDAMENTALS[fid]
+        if fid not in fts:
+            fts[fid] = {"title": spec["title"], "status": "not_started",
+                        "mastered_at": None, "checklist": {}}
+            changed = True
+        f = fts[fid]
+        if f.get("title") != spec["title"]:
+            f["title"] = spec["title"]
+            changed = True
+        cl = f.setdefault("checklist", {})
+        # Add missing items.
+        for key in spec["checklist"]:
+            if key not in cl:
+                cl[key] = False
+                changed = True
+        # Remove obsolete items.
+        for key in list(cl.keys()):
+            if key not in spec["checklist"]:
+                del cl[key]
+                changed = True
+
+    if changed:
+        state["schema_version"] = SCHEMA_VERSION
+        for fid in ORDER:
+            _recompute_status(state, fid)
+    return changed
+
+
 def load_state() -> dict:
     p = progress_path()
     if not p.exists():
         print(f"No progress file found at {p}. Run:  python track.py init")
         sys.exit(1)
     try:
-        return json.loads(p.read_text())
+        state = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
         print(f"Could not read progress file ({e}). You may need to reset.")
         sys.exit(1)
+    if _migrate(state):
+        save_state(state)
+    return state
 
 
 def save_state(state: dict) -> None:
     state["updated"] = now_iso()
-    progress_path().write_text(json.dumps(state, indent=2) + "\n")
+    progress_path().write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- #
@@ -189,6 +272,14 @@ def _find_upwards(filename: str, start: Path) -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def _exists_in_tree_or_root(filename: str) -> bool:
+    cwd = Path.cwd()
+    if _find_upwards(filename, cwd):
+        return True
+    ok, root = _git("rev-parse", "--show-toplevel")
+    return bool(ok and root and (Path(root) / filename).exists())
 
 
 def auto_check(item_key: str) -> bool | None:
@@ -214,20 +305,16 @@ def auto_check(item_key: str) -> bool | None:
         return bool(val.strip())
 
     if item_key == "claude_md_exists":
-        # CLAUDE.md in cwd, anywhere up the tree, or in the repo root.
-        if _find_upwards("CLAUDE.md", cwd):
-            return True
-        ok, root = _git("rev-parse", "--show-toplevel")
-        if ok and root and (Path(root) / "CLAUDE.md").exists():
-            return True
-        return False
+        return _exists_in_tree_or_root("CLAUDE.md")
+
+    if item_key == "mcp_config":
+        return _exists_in_tree_or_root(".mcp.json")
 
     if item_key == "test_cmd_present":
-        # package.json scripts.test, a Makefile test target, or python test config.
         pkg = _find_upwards("package.json", cwd)
         if pkg:
             try:
-                data = json.loads(pkg.read_text())
+                data = json.loads(pkg.read_text(encoding="utf-8"))
                 if data.get("scripts", {}).get("test"):
                     return True
             except Exception:
@@ -235,7 +322,7 @@ def auto_check(item_key: str) -> bool | None:
         mk = _find_upwards("Makefile", cwd)
         if mk:
             try:
-                if "test:" in mk.read_text():
+                if "test:" in mk.read_text(encoding="utf-8"):
                     return True
             except Exception:
                 pass
@@ -243,7 +330,8 @@ def auto_check(item_key: str) -> bool | None:
             f = _find_upwards(cfg, cwd)
             if f:
                 try:
-                    if "pytest" in f.read_text() or "[tool.pytest" in f.read_text():
+                    txt = f.read_text(encoding="utf-8")
+                    if "pytest" in txt or "[tool.pytest" in txt:
                         return True
                 except Exception:
                     pass
@@ -305,10 +393,11 @@ SHAKA = r"""
       |    |        Aloha spirit, you earned it.
       |    |___
       |        \___
-       \           \
-        |           |   {title}
-        |           |   M A S T E R E D
-        |           |
+      |            \___
+       \               \
+        |               |   {title}
+        |               |   M A S T E R E D
+        |               |
    ============================
      Hang loose. On to the next one, braddah.
 """
@@ -335,7 +424,7 @@ def cmd_init(args) -> None:
 def cmd_status(args) -> None:
     state = load_state()
     print("\n  CLAUDE CODE — FUNDAMENTALS PROGRESS")
-    print("  " + "-" * 46)
+    print("  " + "-" * 52)
     mastered = 0
     for fid in ORDER:
         f = state["fundamentals"][fid]
@@ -345,8 +434,8 @@ def cmd_status(args) -> None:
         if f["status"] == "mastered":
             mastered += 1
         icon = STATUS_ICON[f["status"]]
-        print(f"  {icon:<7} {fid}  {f['title']:<40} {done}/{total}")
-    print("  " + "-" * 46)
+        print(f"  {icon:<7} {fid}  {f['title']:<42} {done}/{total}")
+    print("  " + "-" * 52)
     print(f"  Mastered: {mastered}/{len(ORDER)} fundamentals\n")
     if mastered == len(ORDER):
         print("  🌺 All fundamentals mastered. You ARE the Aloha spirit. 🤙\n")
@@ -368,7 +457,7 @@ def cmd_detail(args) -> None:
     print(f"\n  {fid} — {spec['title']}   [{f['status']}]")
     print("  " + "-" * 60)
     print(f"  WHY: {spec['why']}\n")
-    print("  CHECKLIST:")
+    print("  CHECKLIST / TO-DO:")
     for key, meta in spec["checklist"].items():
         box = "[x]" if f["checklist"][key] else "[ ]"
         tag = "auto" if meta["kind"] == "auto" else "self"
