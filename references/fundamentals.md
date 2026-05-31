@@ -1,71 +1,105 @@
 # Claude Code Fundamentals — Reference
 
-Read the section for whichever fundamental you're coaching. Each has four parts:
-**Why it's needed**, **How to master it** (steps), **Example**, and **How it's
-verified** (which checklist items are auto-detected vs. self-confirmed, and the
-exact item keys to pass to `track.py mark`).
+The nine fundamentals from Boris's Claude Code talk, in the order a new user
+should meet them. Read the section for whichever fundamental you're coaching.
+Each has parts that map onto the five-phase teaching flow:
+
+- **What it is & why it's needed** — phase 1: explain how it works, first.
+- **How to use it (to-do list)** — phases 2 & 3: mine this for concrete examples to
+  show, then present it as the detailed, step-by-step mastery plan. Reveal only after
+  the user moves past the explanation.
+- **Try it now** — phase 4: something to actually do together in their real project.
+- **How it's verified** — phase 5: which checklist items are auto-detected vs. self-
+  confirmed, and the exact item keys to pass to `track.py mark`. Do not reach this phase
+  until phases 1–3 have been delivered.
 
 ## Contents
 - [F1 — Setup & Environment Optimization](#f1)
 - [F2 — Codebase Q&A](#f2)
 - [F3 — Git History & Standup Reports](#f3)
 - [F4 — Agentic Workflow: Plan → Edit → PR](#f4)
-- [F5 — Context Management with CLAUDE.md](#f5)
-- [F6 — Speed & Keybindings](#f6)
-- [F7 — Feedback Loops & Advanced Tools](#f7)
+- [F5 — Teach Claude Your Tools (CLIs + MCP)](#f5)
+- [F6 — Feedback Loops](#f6)
+- [F7 — Context Management (CLAUDE.md & friends)](#f7)
+- [F8 — Speed & Keybindings](#f8)
+- [F9 — SDK as a Unix Utility (+ parallel)](#f9)
 
 ---
 
 <a id="f1"></a>
 ## F1 — Setup & Environment Optimization
 
-**Why it's needed.** A tool you fight with on day one is a tool you abandon by day
-three. Five minutes spent making input comfortable and connecting your repo turns
-Claude Code from a novelty into something you reach for without thinking.
+**What it is & why it's needed.** Claude Code is a free-form, fully agentic tool —
+you open it to a bare prompt. A few minutes of setup removes the day-one friction
+(awkward newlines, a harsh theme, repeated permission prompts) so it becomes a
+daily habit instead of a novelty. All you need to run it is Node.js.
 
-**How to master it.**
-1. Confirm Node.js is installed, then install Claude Code per the terminal install
-   command.
-2. Run `terminal-setup` so **Shift+Enter** inserts a newline instead of submitting —
-   essential for writing multi-line prompts.
-3. Run `theme` and pick light, dark, or daltonize — whatever's easy on your eyes.
-4. Run the GitHub app install (`/install-github-app`) so you can `@`-mention Claude
-   on issues and pull requests.
+**How to use it (to-do list).**
+1. Install Claude Code (needs Node.js). In a **plain terminal**, run `/terminal-setup`
+   so **Shift+Enter** inserts a newline instead of submitting. *Note:* in the **VS Code
+   / JetBrains extension** this is already built in and `/terminal-setup` doesn't exist
+   there — Shift+Enter just works, so this item is satisfied by the environment.
+2. Run `/theme` and pick light, dark, or daltonize — whatever's easy on your eyes.
+3. Run `/install-github-app` to connect the GitHub app — then actually *use* it (see
+   "Using the GitHub app" below). It's not done at install; the point is the workflows.
+4. Customize your **allowed tools** so commands you run constantly aren't re-prompted
+   every time. When Claude asks permission, choose "Yes, and don't ask again", or edit
+   `.claude/settings.json` `permissions.allow` directly (big convenience win).
+5. *(Optional, macOS)* Enable Dictation and double-tap the key to **speak** your
+   prompts like you'd brief another engineer — specific spoken prompts work great.
 
-**Example.** Open a long prompt across three lines using Shift+Enter, switch the
-theme once to confirm it takes effect, then `@`-mention Claude on a test issue in
-your repo and watch it respond.
+**Using the GitHub app (what to do after install).** The app lets you delegate to
+Claude from GitHub itself and wires it into CI:
+- **`@`-mention on an issue:** comment `@claude can you implement this?` on a GitHub
+  issue — Claude reads the thread, writes the code, and opens a PR with the fix.
+- **`@`-mention on a pull request:** comment `@claude review this PR` or `@claude fix
+  the failing test` on a PR; it pushes commits to that PR's branch.
+- **Ask for an explanation:** `@claude why might this change break anything?` for a
+  review-style answer inline on the PR.
+- **Automate with a workflow:** the app runs as a GitHub Action, so you can trigger
+  these from CI (e.g. auto-label or triage issues) — the same mechanism Claude Code's
+  own repo uses to label issues.
+
+**Try it now.** Pick a real (or test) issue in your repo and comment
+`@claude summarize what this issue is asking for and suggest an approach`, then watch
+it respond on GitHub. Also switch your theme once to confirm it takes effect.
 
 **How it's verified.**
-- `config_present` *(auto)* — track.py looks for a Claude config on the machine.
-- `newline_without_submit` *(self)* — you confirm Shift+Enter adds a newline.
-- `theme_set` *(self)* — you confirm you set a comfortable theme.
-- `github_app` *(self)* — you confirm the GitHub app is connected.
+- `config_present` *(auto)* — track.py finds a Claude config on the machine.
+- `terminal_setup` *(self)* — Shift+Enter adds a newline (auto-satisfied in the IDE
+  extension; run `/terminal-setup` only in a plain terminal).
+- `theme_set` *(self)* — you set a comfortable theme.
+- `github_app` *(self)* — the app is connected **and** you've `@`-mentioned Claude on
+  an issue or PR at least once.
+- `allowed_tools` *(self)* — you allow-listed routine commands.
 
 ---
 
 <a id="f2"></a>
-## F2 — Codebase Q&A (explore before you edit)
+## F2 — Codebase Q&A (start here)
 
-**Why it's needed.** The instinct is to let the AI edit immediately. The higher-value
-first move is to use it as a search engine that understands *meaning*. "Where is this
-instantiated and how is it used?" gets you a wiki-style tour that a `Cmd+F` for the
-string never could — and that understanding makes every later edit safer.
+**What it is & why it's needed.** The highest-value *first* use of Claude Code isn't
+editing — it's asking questions about your codebase. It explores and explains with
+meaning, not text-matching, so you get a wiki-style tour instead of a `Cmd+F` hit.
+This is exactly how Anthropic onboards new hires (cutting onboarding from weeks to
+days). There's no indexing and no upload — your code stays local, so there's zero
+setup and you can ask immediately.
 
-**How to master it.**
+**How to use it (to-do list).**
 1. Pick a class or function you don't fully understand. Ask how and where it's
-   instantiated — not a text match, the actual usage.
-2. Follow up: "How is this piece of code used across the project?" and let Claude
-   explain the logic and call sites.
-3. (Optional, Mac) Enable Dictation and double-tap the key to *talk* your questions,
-   like briefing another engineer, instead of typing long prose.
+   instantiated — the actual usage, not a string match.
+2. Follow up: "How is this used across the project?" and let Claude trace the call
+   sites and logic.
+3. Use this to learn the *boundary* of what Claude can one-shot vs. where you need
+   to guide it — that intuition makes every later step better.
 
-**Example.** In your own repo: "Explain how `PaymentProcessor` is constructed and
-every place it's used, and what would break if I changed its constructor." Compare the
-depth of that answer to what a plain search would have given you.
+**Try it now.** In their repo: "Explain how `<RealClass>` is constructed and every
+place it's used, and what would break if I changed its constructor." Compare the
+depth to what a plain search would have given.
 
-**How it's verified.** Both items are *self*-confirmed:
-- `deeper_than_search` — you got an explanation deeper than a text search.
+**How it's verified.** All self-confirmed:
+- `asked_question` — you asked Claude a real question about your code.
+- `deeper_than_search` — the answer went deeper than a text search.
 - `usage_followup` — you asked a "how is this used?" follow-up and got the logic.
 
 ---
@@ -73,23 +107,24 @@ depth of that answer to what a plain search would have given you.
 <a id="f3"></a>
 ## F3 — Git History & Standup Reports
 
-**Why it's needed.** Source code tells you *what* the system does; git history tells
-you *why* it ended up that way. Claude can read your local log and linked issues to
-reconstruct decisions — and it can summarise what *you personally* shipped, which is
-the standup nobody enjoys writing.
+**What it is & why it's needed.** Source code tells you *what* the system does; git
+history tells you *why* it got that way. Claude reads your local log and the issues
+commits link to, with no special prompting — the model just knows to use git. It can
+also summarise what *you personally* shipped, which is the standup nobody enjoys
+writing.
 
-**How to master it.**
-1. Find a function with a confusing signature. Ask: "Why does this function take these
-   arguments?" Claude will dig through git history and linked issues to explain.
-2. Ask: "What did I ship this week?" Claude identifies your git username and lists your
-   commits in plain language.
+**How to use it (to-do list).**
+1. Find a function with a confusing signature. Ask: "Why does this take these
+   arguments? Check the history." Claude digs through commits and linked issues.
+2. Ask: "What did I ship this week?" Claude finds your git username and lists your
+   commits in plain language — copy it straight into your standup doc.
 
-**Example.** "Look at `retryWithBackoff` — why does it take both a `jitter` flag and a
-`maxDelay`? Check the history." Then: "Summarise my commits since Monday for standup."
+**Try it now.** "Look at `<confusingFn>` — why does it take all these arguments? Check
+the git history." Then: "Summarise my commits since Monday for standup."
 
 **How it's verified.**
 - `in_git_repo` *(auto)* — track.py confirms you're inside a git repository.
-- `history_explained` *(self)* — you confirm Claude explained the historical "why".
+- `history_explained` *(self)* — Claude explained the historical "why".
 - `shipped_summary` *(self)* — you got a "what did I ship" summary.
 
 ---
@@ -97,104 +132,169 @@ the standup nobody enjoys writing.
 <a id="f4"></a>
 ## F4 — Agentic Workflow: Plan → Edit → PR
 
-**Why it's needed.** Turning an agent loose to edit unsupervised is how you get
-surprised by a sprawling diff. Asking for a plan *first* keeps you in the driver's
-seat. Once you approve, the "commit push PR" incantation automates the boring,
-error-prone git and pull-request plumbing.
+**What it is & why it's needed.** Claude has a small, powerful toolset (edit files,
+run bash, search) and strings them together itself. But handing it a huge task cold
+can produce something that isn't what you wanted. Asking it to **plan first** is the
+easiest way to get the result you intended — and once you approve, "commit push PR"
+automates the boring, error-prone git/PR plumbing.
 
-**How to master it.**
-1. Before any non-trivial change, prompt: **"Before you write code, make a plan and
-   run it by me."** Read it, push back, approve.
-2. After the change is made and you're happy, say **"commit push PR"**. Claude creates
-   the branch, writes the commit message, pushes, and opens the pull request.
+**How to use it (to-do list).**
+1. Before any non-trivial change: **"Before you write code, brainstorm and make a
+   plan, then run it by me."** Read it, push back, approve. (No special plan mode
+   needed — just ask.)
+2. Let Claude implement the approved plan.
+3. When you're happy: **"commit push PR"** — it makes the branch, writes the commit
+   in your repo's style, pushes, and opens the pull request.
 
-**Example.** "Add rate-limiting to the `/login` endpoint. Before you write code, make a
-plan and run it by me." Approve the plan, let it implement, then: "commit push PR".
+**Try it now.** "Add `<small feature>` to `<file>`. Before you write code, make a plan
+and run it by me." Approve, let it implement, then: "commit push PR".
 
 **How it's verified.**
-- `recent_commits` *(auto)* — track.py sees recent commit activity in the repo.
-- `plan_approved` *(self)* — you confirm you approved a plan before any file changed.
-- `pr_created` *(self)* — you confirm Claude opened a PR via "commit push PR".
+- `recent_commits` *(auto)* — track.py sees recent commit activity.
+- `plan_approved` *(self)* — you approved a plan before any file changed.
+- `edit_made` *(self)* — Claude implemented the change.
+- `pr_created` *(self)* — "commit push PR" opened a PR.
 
 ---
 
 <a id="f5"></a>
-## F5 — Context Management with CLAUDE.md
+## F5 — Teach Claude Your Tools (CLIs + MCP)
 
-**Why it's needed.** Claude starts every session with zero memory of your project. A
-`CLAUDE.md` in your repo is the standing brief it reads automatically each time — your
-common commands, style conventions, key file paths, and gotchas — so you stop
-re-explaining the same things.
+**What it is & why it's needed.** Claude Code really shines once it can drive *your
+team's* tools. Two kinds: **bash CLIs** (tell Claude about a command and point it at
+`--help`) and **MCP servers** (structured tool integrations). Give Claude the tools
+your team already uses on a codebase and it operates them on your behalf — and an
+`.mcp.json` checked into the repo means every teammate gets them automatically.
 
-**How to master it.**
-1. Create a `CLAUDE.md` in your project root. Put in the build/test commands, code
-   style rules, and any "always do X / never do Y" instructions.
-2. Mid-session, use the **`#` shortcut** (e.g. `# always run the test suite before
-   declaring done`) to have Claude append a note to your context files for you.
-3. Run `/memory` to see exactly which files and rules are currently loaded.
+**How to use it (to-do list).**
+1. Pick a CLI your team uses. Tell Claude: "Use `<cli>` — run `<cli> --help` first to
+   learn it," and let it figure out the commands.
+2. Add an MCP server (e.g. a Puppeteer server for browser screenshots) and ask Claude
+   to use its tools.
+3. Drop frequently-used tool instructions into CLAUDE.md (see F7) so Claude remembers
+   them across sessions, and check `.mcp.json` into the repo to share with the team.
 
-**Example.** Ask Claude: "Draft a CLAUDE.md for this project based on what you can see —
-build commands, test command, and the directory layout." Refine it, save it, then run
-`/memory` to confirm it's loaded.
+**Try it now.** Teach Claude one real CLI from their workflow via `--help`, or add one
+MCP server and have Claude call a tool from it.
 
 **How it's verified.**
-- `claude_md_exists` *(auto)* — track.py finds a `CLAUDE.md` in the project tree.
-- `memory_loaded` *(self)* — `/memory` shows your project rules are loaded.
-- `memory_shortcut` *(self)* — you added a note using the `#` shortcut.
+- `mcp_config` *(auto)* — track.py finds an `.mcp.json` in the project.
+- `cli_taught` *(self)* — you taught Claude a CLI via `--help` / had it run one.
+- `mcp_used` *(self)* — you added or used an MCP server's tools.
 
 ---
 
 <a id="f6"></a>
-## F6 — Speed & Keybindings
+## F6 — Feedback Loops (let Claude check its work)
 
-**Why it's needed.** The gap between "this is neat" and "this is fast" is muscle
-memory. Three keybindings compound more than any others: trusting routine work to
-auto-accept, feeding shell output straight back to Claude, and stopping a bad edit the
-instant you see it going sideways.
+**What it is & why it's needed.** This is the single biggest quality lever. When Claude
+can *check its own work* — run unit tests, screenshot a web page with Puppeteer, grab
+the iOS simulator — it iterates to something that actually works instead of handing
+you untested code. Give it a mock and a way to see the result and it'll often get a UI
+almost perfect after two or three iterations.
 
-**How to master it.**
-1. **`!` bash mode** — prefix a command (e.g. `!ls -la` or `!npm run build`). Claude
-   sees the output on the next turn, so you don't copy-paste it.
-2. **Escape to interrupt** — when an edit drifts, hit **Escape** to stop it, tell Claude
-   what to change, then let it redo. Don't sit through a wrong edit.
-3. **Shift+Tab auto-accept** — for work you trust (e.g. repetitive unit tests), enter
-   auto-accept mode so you're not approving each diff.
+**How to use it (to-do list).**
+1. **Give it a checker.** Point Claude at your test command, or set up a screenshot
+   tool, so it can verify and self-correct.
+2. **Visual coding.** Drag a UI mock-up image into the terminal, ask Claude to build
+   it, and let it screenshot + compare in a loop until it matches.
+3. Whatever your domain (tests, integration, screenshots) — give it a way to *see* its
+   result and tell it to iterate.
 
-**Example.** Run `!npm test`, let Claude read the failures, and ask it to fix them.
-Mid-fix, if it heads the wrong way, Escape and redirect. For the boilerplate tests,
-Shift+Tab and let it run.
+**Try it now.** "Implement `<change>`. After each edit, run the tests (or take a
+screenshot) and keep iterating until it passes/matches."
 
-**How it's verified.** All three are *self*-confirmed:
-- `bash_mode` — you used `!` to pipe command output into context.
-- `escape_undo` — you stopped an edit with Escape and redirected it.
-- `auto_accept` — you used Shift+Tab auto-accept for trusted work.
+**How it's verified.**
+- `test_cmd_present` *(auto)* — track.py finds a test/build command.
+- `iterated_on_feedback` *(self)* — Claude iterated using a test/screenshot it ran.
+- `visual_coding` *(self)* — you tried a mock image, or wired up a checker tool.
 
 ---
 
 <a id="f7"></a>
-## F7 — Feedback Loops & Advanced Tools
+## F7 — Context Management (CLAUDE.md & friends)
 
-**Why it's needed.** Claude is dramatically better when it can *check its own work*.
-Hand it a test command or a way to take a screenshot and it iterates to something that
-actually works, instead of returning untested code you then have to debug. This is the
-single biggest quality lever.
+**What it is & why it's needed.** Claude starts every session with no memory of your
+project. A `CLAUDE.md` in your repo root is the standing brief it reads automatically
+each session — common commands, style guide, key files, gotchas. The more good context
+you give it, the smarter its decisions. Keep it short, or it just burns context.
 
-**How to master it.**
-1. **Give it a checker.** Point Claude at your test command, or set up a screenshot tool
-   (e.g. a Puppeteer MCP server) so it can see the rendered UI and self-correct.
-2. **Visual coding.** Drag a UI mock-up image into the terminal and ask Claude to build
-   it, then let it screenshot the result and compare.
-3. **SDK as a Unix tool.** Try a pipe like `git status | claude -p "summarise these
-   changes"` to use Claude as a scriptable command-line utility.
+**How to use it (to-do list).**
+1. Create a `CLAUDE.md` in your project root: build/test commands, code-style rules,
+   important files, "always do X / never do Y". Check it in to share with the team.
+   (A `CLAUDE.local.md` is for personal, un-checked-in notes; nested CLAUDE.md files
+   load on demand when Claude works in those directories.)
+2. Run `/memory` to see exactly which context files are currently loaded.
+3. Use the **`#` shortcut** mid-session (e.g. `# always run the test suite before
+   declaring done`) to have Claude append a note to your context for you.
+4. Add a custom **slash command** in `.claude/commands/` for a workflow you repeat;
+   `@`-mention files to pull them into context.
 
-**Example.** "Implement this layout [drop image]. After each change, run the tests and
-take a screenshot, and keep iterating until it matches." Separately, try
-`git diff | claude -p "write a commit message"`.
+**Try it now.** "Draft a CLAUDE.md for this project from what you can see — build
+command, test command, directory layout." Refine and save it, then run `/memory`.
 
 **How it's verified.**
-- `test_cmd_present` *(auto)* — track.py finds a test/build command in your project.
-- `iterated_on_feedback` *(self)* — Claude iterated using a test or screenshot it ran.
-- `sdk_pipe` *(self)* — you used a `-p` pipe like `git status | claude -p "..."`.
+- `claude_md_exists` *(auto)* — track.py finds a `CLAUDE.md` in the project.
+- `memory_loaded` *(self)* — `/memory` showed your loaded files.
+- `memory_shortcut` *(self)* — you used `#` to remember something.
+- `slash_command` *(self)* — you created/used a custom slash command.
+
+---
+
+<a id="f8"></a>
+## F8 — Speed & Keybindings
+
+**What it is & why it's needed.** The terminal is minimal, so the fastest bindings are
+easy to miss. A handful of them turn "neat" into "fast": trust routine work to
+auto-accept, pipe shell output straight into context, and stop a bad edit the instant
+you see it drift.
+
+**How to use it (to-do list).**
+1. **`!` bash mode** — prefix a command (`!npm run build`); its output goes into
+   context so Claude sees it next turn without copy-paste.
+2. **Escape to interrupt** — when an edit drifts, hit **Escape** to stop it safely
+   (never corrupts the session), say what to change, and let it redo. **Escape twice**
+   jumps back in history.
+3. **Shift+Tab auto-accept** — for trusted work (e.g. iterating on unit tests), edits
+   auto-apply; bash still asks. You can always have Claude undo later.
+4. Resume work with `claude --resume` / `--continue`; hit **Ctrl+R** to see the full
+   output Claude sees. (`#` to remember and `@` to mention files live here too.)
+
+**Try it now.** Run `!<your test command>`, let Claude read the failures and fix them;
+if it heads the wrong way, Escape and redirect. For boilerplate, Shift+Tab and let it run.
+
+**How it's verified.** All self-confirmed:
+- `bash_mode` — you used `!` to pipe command output into context.
+- `escape_interrupt` — you stopped an edit with Escape and redirected it.
+- `auto_accept` — you used Shift+Tab auto-accept for trusted work.
+- `resume_session` — you used `--resume`/`--continue` or `Ctrl+R`.
+
+---
+
+<a id="f9"></a>
+## F9 — SDK as a Unix Utility (+ parallel)
+
+**What it is & why it's needed.** The `-p` flag *is* the Claude Code SDK — the same
+engine Claude Code runs on. Think of it as a super-intelligent Unix utility: give it a
+prompt, pipe data in, get text or JSON out, use it anywhere (CI, incident response,
+pipelines). Power users also run **many sessions in parallel** to get more done at once.
+
+**How to use it (to-do list).**
+1. Run a one-shot: `claude -p "summarise the changes"` — or pipe into it, e.g.
+   `git status | claude -p "summarise these changes"` or `git diff | claude -p "write a
+   commit message"`.
+2. Add flags: `--allowed-tools` to permit specific commands, `--output-format json`
+   (or streaming JSON) when you need to process the result in a script.
+3. Go parallel: run multiple sessions via tmux/SSH, separate checkouts of the repo, or
+   **git worktrees** for isolation.
+
+**Try it now.** `git diff | claude -p "write a commit message for these changes"`, then
+try one parallel session in a second terminal or a git worktree.
+
+**How it's verified.** All self-confirmed:
+- `sdk_pipe` — you used `claude -p`, e.g. piping `git status` into it.
+- `sdk_flags` — you tried `--output-format`/`--allowed-tools` or used it in a script.
+- `parallel_sessions` — you ran parallel sessions (tmux / checkouts / worktrees).
 
 ---
 
@@ -202,5 +302,5 @@ take a screenshot, and keep iterating until it matches." Separately, try
 
 A fundamental is mastered when **every** checklist item is true. At that moment
 `track.py master F<n>` (or the final `mark`) prints the Shaka 🤙 — the "hang loose"
-sign and a bit of Aloha spirit. When all seven are mastered, the dashboard shows the
+sign and a bit of Aloha spirit. When all nine are mastered, the dashboard shows the
 full-Aloha banner. Honour the celebration; it's the point.
